@@ -186,9 +186,17 @@ if SERVER then
 			return creed_targets
 		end
 
+		--We need a Table with all T-Colleagues of the Assassin--
+		local tcolleagues = {}
+			for _, tplys in pairs(player.GetAll()) do
+				if tplys ~= ply and tplys:GetTeam() == TEAM_TRAITOR then
+					table.insert( tcolleagues, tplys )
+				end
+			end	
+
 		--We start a timer, so that the Assassin can prepare themselves. Then they get the Target and the Clock starts ticking--
-		timer.Simple(8, function()
-			if CreedThemeActive:GetBool() then
+		timer.Simple(5, function()	
+			if CreedThemeActive:GetBool() and ply:Alive() then
 				creed_ostplays = true
 				creed_sound = ReadSound(ACOST[math.random(1, #ACOST)])
 				creed_sound:Play()
@@ -203,7 +211,10 @@ if SERVER then
 				net.Start("ACPMessage")
 				net.WriteEntity( ChosenTemplar )
 				net.Send( ply )
-			
+
+				net.Start("ACTMessage")
+				net.WriteEntity( ChosenTemplar )
+			 	net.Send( tcolleagues )
 
 			for _, l in pairs(player.GetAll()) do
 				if l:GetTeam() == TEAM_TRAITOR and not l:HasEquipmentItem("item_ttt_the_assassin") then
@@ -232,13 +243,11 @@ if SERVER then
 						creed_sound:Stop()
 					end
 
-					hook.Remove("TemplarDeath")
-
 					for _, g in pairs(player.GetAll()) do
 						if g:HasEquipmentItem("item_ttt_the_assassin") then
 							return
 						else
-							g:ScreenFade( SCREENFADE.OUT, Color(255, 255, 255), 0.1, 3)
+							g:ScreenFade( SCREENFADE.OUT, Color(255, 255, 255), 0.1, 2)
 						end
 					end
 
@@ -266,6 +275,8 @@ if SERVER then
 
 					CreedBroadcast("Anonymous Creed: ", Color(255, 114, 86), "The Assassin disappeared. There´s no trace of him. He fulfilled his contract. The Game goes on!")
 
+					hook.Remove("TemplarDeath")
+
 					timer.Create("LetACrespawn", 1, 600, function()
 						if ply:Health() < 15 then
 							ply:SetHealth(110)
@@ -278,7 +289,7 @@ if SERVER then
 					end)
 
 				-- TODO!
-				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR or attacker:IsVampire() and attacker ~= ply then
+				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR and attacker ~= ply then
 					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The treacherous Assassin ", Color(255, 255, 000), ply:Nick(), Color(153, 0, 0), " was support by a Traitor called ", Color(255, 255, 000), attacker:Nick(), Color(153, 0, 0), ". You can kill them!")
 
 					ply:SetWalkSpeed(250)
@@ -292,7 +303,7 @@ if SERVER then
 						creed_sound:Stop()
 					end
 
-				elseif victim == ChosenTemplar and attacker ~= ply and not attacker:IsVampire() or not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
+				elseif victim == ChosenTemplar and attacker ~= ply and not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
 					if ply:HasEquipmentItem("item_ttt_the_assassin") then
 						net.Start("ACPUninitiatedMessage")
 						net.WriteEntity( ChosenTemplar )
@@ -359,7 +370,7 @@ if SERVER then
 						creed_sound:Stop()
 					end
 				end
-			end)
+			end) 	
 		end)
 
 		--When the Round is over, a hook will clean up.--
