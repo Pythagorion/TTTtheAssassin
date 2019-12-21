@@ -21,6 +21,10 @@ if SERVER then
 	util.AddNetworkString("ACMUSIC")
 	util.AddNetworkString("CreedOverrideTargetID")
 	util.AddNetworkString("ACPMessage")
+	util.AddNetworkString("ACTMessage")
+	util.AddNetworkString("ACPassAwayMessage")
+	util.AddNetworkString("ACPUninitiatedMessage")
+	util.AddNetworkString("ACPSuccessMessage")
 
 	function CreedBroadcast(...)
 		local acmsg = {...}
@@ -191,6 +195,7 @@ if SERVER then
 			end
 
 			local creed_targets = CreateTemplarPool(ply)
+			local ChosenTemplar
 
 			if #creed_targets > 0 then
 				ChosenTemplar = creed_targets[math.random(1, #creed_targets)]
@@ -202,16 +207,16 @@ if SERVER then
 
 			for _, l in pairs(player.GetAll()) do
 				if l:GetTeam() == TEAM_TRAITOR and not l:HasEquipmentItem("item_ttt_the_assassin") then
-					CreedBroadcast("Anonymous Creed: ", Color(100, 149, 237), "The Assassin´s Target is: ", Color(060, 179, 113), ChosenTemplar:Nick(), Color(100, 149, 237), ". DO NOT KILL HIM! If you help the Assassin to kill the Target, you both get revealed!")
+					CreedBroadcast()
 				end
 			end
 
 			--This Hook controls everything. When the contract is done, the Assassin gets his reward. When he was supported, he will fail.-- 
 			hook.Add("PlayerDeath", "TemplarDeath", function(victim, inflictor, attacker)
 				if ( victim == ChosenTemplar ) and ( attacker == ply ) then
-					if ply:HasEquipmentItem("item_ttt_the_assassin") then
-						CreedBroadcast("Anonymous Creed: ", Color(255,165,0), "Well done, young Novice. Welcome to the Brotherhood. You´ve earned some Rewards!")
-					end
+					net.Start("ACPSuccessMessage")
+				 	net.WriteEntity( ChosenTemplar )
+					net.Send( ply )
 
 					ply:SetWalkSpeed(250)
 					ply:SetJumpPower(200)
@@ -289,7 +294,9 @@ if SERVER then
 
 				elseif victim == ChosenTemplar and attacker ~= ply and not attacker:IsVampire() or not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
 					if ply:HasEquipmentItem("item_ttt_the_assassin") then
-						CreedBroadcast("Anonymous Creed: ", Color(255,165,0), "An Uninitated killed your Target. You cannot fulfill your duty. Your Contract ends. We´ll give some Bonuses.")
+						net.Start("ACPUninitiatedMessage")
+						net.WriteEntity( ChosenTemplar )
+						net.Send( ply )
 					end
 
 					ply:SetWalkSpeed(250)
@@ -304,9 +311,9 @@ if SERVER then
 					end
 
 				elseif victim == ChosenTemplar and victim == attacker or attacker:IsWorld() then
-					if ply:HasEquipmentItem("item_ttt_the_assassin") then
-						CreedBroadcast("Anonymous Creed: ", Color(255,165,0), "The Templar passed away by himself. You cannot fulfill your duty. Your Contract ends. We´ll give some Bonuses.")
-					end
+					net.Start("ACPassAwayMessage")
+					net.WriteEntity( ChosenTemplar )
+					net.Send( ply )
 
 					ply:SetWalkSpeed(250)
 					ply:SetJumpPower(200)
@@ -405,8 +412,29 @@ if CLIENT then
 	end)
 
 	net.Receive("ACPMessage", function()
-		net.ReadEntity( ChosenTemplar )
+		local ChosenTemplar = net.ReadEntity()
 		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Hey, young Novice. Your Target is: ", Color(148, 000, 211), ChosenTemplar:Nick(), Color(255,165,0), ". Eliminate him and you´ll be good to go. But do it alone!")
 		chat.PlaySound()
 	end)
+
+	net.Receive("ACTMessage", function()
+		local ChosenTemplar = net.ReadEntity()
+		chat.AddText("Anonymous Creed: ", Color(100, 149, 237), "The Assassin´s Target is: ", Color(060, 179, 113), ChosenTemplar:Nick(), Color(100, 149, 237), ". DO NOT KILL HIM! If you help the Assassin to kill the Target, you both get revealed!")
+		chat.PlaySound()
+	end)
+
+	net.Receive("ACPUninitiatedMessage", function()
+		chat.AddText("Anonymous Creed: ", Color(255,165,0), "An Uninitiated killed your Target. You cannot fulfill your duty. Your Contract ends. We´ll give some Bonuses.")
+		chat.PlaySound()
+  	end)
+
+  	net.Receive("ACPSuccessMessage", function()
+  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Well done, young Novice. Welcome to the Brotherhood. You´ve earned some Rewards!")
+  		chat.PlaySound()
+  	end)
+
+  	net.Receive("ACPassAwayMessage", function()
+  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "The Templar passed away by himself. You cannot fulfill your duty. Your Contract ends. We´ll give some Bonuses.")
+  		chat.PlaySound()
+  	end)
 end
