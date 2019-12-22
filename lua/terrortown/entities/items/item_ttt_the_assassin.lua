@@ -372,23 +372,13 @@ if SERVER then
 				end
 			end) 	
 		end)
-
-		--When the Round is over, a hook will clean up.--
-		hook.Add("TTTEndRound", "ACEVENTREMOVAL", function()
-			hook.Remove("TemplarDeath")
-			hook.Remove("AssassinDies")
-
-			timer.Remove("ClockIsTicking")
-			timer.Remove("LetACrespawn")
-
-			creed_sound:Stop()
-
-			ply:SetWalkSpeed(250)
-			ply:SetJumpPower(200)
-			ply:SetHealth(100)
-			ply:SetNWBool("CreedDisguise", false)
-		end)
 	end
+
+	hook.Add("TTTEndRound", "ResettheStuff", function()
+		hook.Remove("TemplarDeath")
+		hook.Remove("AssassinDies")
+		timer.Remove("ClockIsTicking")
+	end)
 
 	--These Hooks ensure that you can see that the dead Assassin was one--
 	hook.Add("TTTBodySearchEquipment", "CreedoCorpseIcon", function(search, eq)
@@ -406,6 +396,7 @@ if SERVER then
 		search.eq_theassassin = {img = "vgui/ttt/icon_the_assassin", text = "He was a Brother of the Creed.", p = highest + 1}
 	end)
 end
+
 
 --The Client shall be able to get the Script´s Messages and the Music--
 if CLIENT then
