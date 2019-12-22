@@ -275,7 +275,7 @@ if SERVER then
 
 					CreedBroadcast("Anonymous Creed: ", Color(255, 114, 86), "The Assassin disappeared. There´s no trace of him. He fulfilled his contract. The Game goes on!")
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					timer.Create("LetACrespawn", 1, 600, function()
 						if ply:Health() < 15 then
@@ -288,7 +288,6 @@ if SERVER then
 						end
 					end)
 
-				-- TODO!
 				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR and attacker ~= ply then
 					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The treacherous Assassin ", Color(255, 255, 000), ply:Nick(), Color(153, 0, 0), " was support by a Traitor called ", Color(255, 255, 000), attacker:Nick(), Color(153, 0, 0), ". You can kill them!")
 
@@ -297,7 +296,7 @@ if SERVER then
 					ply:SetHealth(100)
 					ply:SetNWBool("CreedDisguise", false)
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -315,7 +314,7 @@ if SERVER then
 					ply:SetHealth(180)
 					ply:SetNWBool("CreedDisguise", false)
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -331,7 +330,7 @@ if SERVER then
 					ply:SetHealth(180)
 					ply:SetNWBool("CreedDisguise", false)
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -351,7 +350,7 @@ if SERVER then
 					ply:SetHealth(100)
 					ply:SetNWBool("CreedDisguise", false)
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -364,7 +363,7 @@ if SERVER then
 				if victim == ply then
 					timer.Remove("ClockIsTicking")
 
-					hook.Remove("TemplarDeath")
+					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -375,9 +374,13 @@ if SERVER then
 	end
 
 	hook.Add("TTTEndRound", "ResettheStuff", function()
-		hook.Remove("TemplarDeath")
-		hook.Remove("AssassinDies")
+		hook.Remove("PlayerDeath" ,"TemplarDeath")
+		hook.Remove("PlayerDeath","AssassinDies")
 		timer.Remove("ClockIsTicking")
+		if CreedThemeActive:GetBool() then
+			creed_sound:Stop()
+		end
+		timer.Remove("LetACrespawn")
 	end)
 
 	--These Hooks ensure that you can see that the dead Assassin was one--
