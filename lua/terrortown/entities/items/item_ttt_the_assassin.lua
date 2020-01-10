@@ -27,6 +27,7 @@ if SERVER then
 	util.AddNetworkString("ACPSuccessMessage")
 	util.AddNetworkString("ACPRevivalMessage")
 	util.AddNetworkString("ACPGetRevivalMessage")
+	util.AddNetworkString("ACPTimeLeftMessage")
 
 	function CreedBroadcast(...)
 		local acmsg = {...}
@@ -153,7 +154,7 @@ if SERVER then
 		ply:SetHealth(400)
 		ply:SetWalkSpeed(375)
 		ply:SetJumpPower(400)
-		ply.ACInvincible = false
+		ply.ACRevivalOption = false
 		ply:Give("weapon_ttt_knife")
 		ply:SetNWBool("CreedDisguise", true)
 		net.Start("CreedOverrideTargetID")
@@ -168,10 +169,15 @@ if SERVER then
 		end
 
 		if ply.ACInvincible then
-			for k,v in pairs(ply:GetWeapons()) do
-				v:SetNextPrimaryFire(CurTime() + 10)
-				v:SetNextSecondaryFire(CurTime() + 10)
-			end
+			print(tostring(ply.ACInvincible))
+			hook.Add("ScalePlayerDamage", "ACMakesNoDamage", function( ply, hitgroup, dmginfo )
+				if not ply:HasEquipmentItem("item_ttt_the_assassin") then
+					dmginfo:ScaleDamage( 0.1 )
+				end
+				timer.Simple(10, function()
+					hook.Remove("ScalePlayerDamage", "ACMakesNoDamage")
+				end)	
+			end)
 		end
 
 
@@ -217,7 +223,41 @@ if SERVER then
 				if traitorsplys:GetTeam() == TEAM_TRAITOR then
 					table.insert( traitorteam, traitorsplys )
 				end
+			end
+
+		--We gather all spawns to use them soon--
+		local spawnpointofmap = {}
+
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_start"))
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_deathmatch"))
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_combine"))
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_rebel"))
+
+					-- CS Maps
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_counterterrorist"))
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_terrorist"))
+
+					-- DOD Maps
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_axis"))
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_allies"))
+
+					-- (Old) GMod Maps
+					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("gmod_player_start"))
+		
+		-- Setting up the Revival-Option for the Team_Traitor--
+		hook.Add("TTT2PostPlayerDeath", "RevivalOfAC", function(ply)
+			if ply.ACRevivalOption then
+				if ply:GetTeam() == TEAM_TRAITOR then
+					net.Start("ACPRevivalMessage")
+					net.Send( victim )
+					ply:Revive(5)
+					timer.Simple(5.1, function()
+						ply:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos()) 
+					end)
+					hook.Remove("TTT2PostPlayerDeath", "RevivalOfAC")
+				end
 			end	
+		end)
 
 		--We start a timer, so that the Assassin can prepare themselves. Then they get the Target and the Clock starts ticking--
 		timer.Simple(5, function()	
@@ -244,22 +284,24 @@ if SERVER then
 			--This Hook controls everything. When the contract is done, the Assassin gets his reward. When he was supported, he will fail.-- 
 			hook.Add("PlayerDeath", "TemplarDeath", function(victim, inflictor, attacker)
 				if ( victim == ChosenTemplar ) and ( attacker == ply ) then
-					ply.ACInvincible = true
+
+					ply:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos())
+
+					if CreedRevivalFActive:GetBool() then
+						ply.ACRevivalOption = true
+					end
+
 					ply:GodEnable()
 					ply:SetHealth(220)
 					net.Start("ACPSuccessMessage")
 				 	net.WriteEntity( ChosenTemplar )
 					net.Send( ply )
+					ply:SetNWBool("CreedDisguise", false)
 					timer.Simple(10, function()
-						ply:SetWalkSpeed(250)
-						ply:SetJumpPower(200)
-						ply:GodDisable()
-						ply:SetNWBool("CreedDisguise", false)
 						if ( CreedRevivalFActive:GetBool() ) then
 							net.Start("ACPGetRevivalMessage")
 							net.Send( traitorteam )
 						end	
-						ply.ACInvincible = false
 					end)
 
 					if ( CreedEagleScreamActive:GetBool() ) then
@@ -271,48 +313,14 @@ if SERVER then
 					end
 
 					for _, g in pairs(player.GetAll()) do
-						if g:HasEquipmentItem("item_ttt_the_assassin") then
-							return
-						else
-							g:ScreenFade( SCREENFADE.OUT, Color(255, 255, 255), 0.1, 2)
+						if not g:HasEquipmentItem("item_ttt_the_assassin") then
+							g:ScreenFade( SCREENFADE.OUT, Color(255, 255, 255), 0.1, 4)
 						end
 					end
-
-					local spawnpointofmap = {}
-
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_start"))
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_deathmatch"))
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_combine"))
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_rebel"))
-
-					-- CS Maps
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_counterterrorist"))
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_terrorist"))
-
-					-- DOD Maps
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_axis"))
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("info_player_allies"))
-
-					-- (Old) GMod Maps
-					spawnpointofmap = table.Add(spawnpointofmap, ents.FindByClass("gmod_player_start"))
 
 					CreedBroadcast("Anonymous Creed: ", Color(255, 114, 86), "The Assassin disappeared. There´s no trace of him. He fulfilled his contract. The Game goes on!")
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
-
-					if CreedRevivalFActive:GetBool() then
-						hook.Add("PlayerDeath", "RevivalOfAC", function(victim, inflictor, attacker)
-                        	if victim:GetTeam() == TEAM_TRAITOR then
-                            	net.Start("ACPRevivalMessage")
-                            	net.Send( victim )
-                        		victim:Revive(5)
-                        		timer.Simple(5, function()
-                        			victim:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos()) 
-                        		end)
-                        		hook.Remove("PlayerDeath", "RevivalOfAC")
-                        	end
-						end)
-					end	
 
 				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR and attacker ~= ply then
 					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The treacherous Assassin ", Color(255, 255, 000), ply:Nick(), Color(153, 0, 0), " was support by a Traitor called ", Color(255, 255, 000), attacker:Nick(), Color(153, 0, 0), ". You can kill them!")
@@ -366,6 +374,14 @@ if SERVER then
 				end
 			end)
 
+			--The Assassin gets a notification that his time runs out soon
+			timer.Simple(120, function()
+				if ChosenTemplar:Alive() then
+					net.Start("ACPTimeLeftMessage")
+					net.Send( ply )
+				end
+			end)
+
 			--The Assassin fails. He gets revealed and he loses his advantages--
 			timer.Create("ClockIsTicking", 150, 1, function()
 				if ChosenTemplar:Alive() then
@@ -403,12 +419,13 @@ if SERVER then
 		end)
 	end
 
-	hook.Add("TTTEndRound", "ResettheStuff", function()
+	function ITEM:RESET(ply)
 		hook.Remove("PlayerDeath" ,"TemplarDeath")
 		hook.Remove("PlayerDeath","AssassinDies")
 		if CreedRevivalFActive:GetBool() then	
 			hook.Remove("PlayerDeath", "RevivalOfAC")
 		end
+		ply.ACRevivalOption = false	
 		timer.Remove("ClockIsTicking")
 		timer.Remove("LetACrespawn")
 		for _, j in pairs(player.GetAll()) do
@@ -418,8 +435,8 @@ if SERVER then
 				j:SetJumpPower(200)
 				j:SetNWBool("CreedDisguise", false)
 			end
-		end			
-	end)
+		end	
+	end
 
 	--These Hooks ensure that you can see that the dead Assassin was one--
 	hook.Add("TTTBodySearchEquipment", "CreedoCorpseIcon", function(search, eq)
@@ -472,7 +489,7 @@ if CLIENT then
   	end)
 
   	net.Receive("ACPSuccessMessage", function()
-  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Well done, young Novice. Welcome to the Brotherhood. You have 10 Seconds to get out of here!")
+  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Well done, young Novice. Welcome to the Brotherhood.")
   		chat.PlaySound()
   	end)
 
@@ -489,5 +506,9 @@ if CLIENT then
     net.Receive("ACPGetRevivalMessage", function()
     	chat.AddText("Anonymous Creed: ", Color(100, 149, 237), "The Assassin fulfilled his duty. As a reward for his success, we will help your Team. If any of you die, we´ll bring you back to life!")
     	chat.PlaySound()
-    end)
+	end)
+	
+	net.Receive("ACPTimeLeftMessage", function()
+		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Hurry Up! The Target is still alive & you have only 30 seconds left to kill him!")
+	end)
 end
