@@ -28,6 +28,7 @@ if SERVER then
 	util.AddNetworkString("ACPRevivalMessage")
 	util.AddNetworkString("ACPGetRevivalMessage")
 	util.AddNetworkString("ACPTimeLeftMessage")
+	util.AddNetworkString("ACDisappearMessage")
 
 	function CreedBroadcast(...)
 		local acmsg = {...}
@@ -150,13 +151,13 @@ if SERVER then
 	possible_targets = {}
 
 	--When a Traitor buys the Item, the first Values will be set and all players are informed--
-	function ITEM:Bought(ply)
-		ply:SetHealth(400)
-		ply:SetWalkSpeed(375)
-		ply:SetJumpPower(400)
-		ply.ACRevivalOption = false
-		ply:Give("weapon_ttt_knife")
-		ply:SetNWBool("CreedDisguise", true)
+	function ITEM:Bought(buyer)
+		buyer:SetHealth(400)
+		buyer:SetWalkSpeed(375)
+		buyer:SetJumpPower(400)
+		buyer.ACRevivalOption = false
+		buyer:Give("weapon_ttt_knife")
+		buyer:SetNWBool("CreedDisguise", true)
 		net.Start("CreedOverrideTargetID")
 		net.Broadcast()
 
@@ -168,36 +169,23 @@ if SERVER then
 			end
 		end
 
-		if ply.ACInvincible then
-			print(tostring(ply.ACInvincible))
-			hook.Add("ScalePlayerDamage", "ACMakesNoDamage", function( ply, hitgroup, dmginfo )
-				if not ply:HasEquipmentItem("item_ttt_the_assassin") then
-					dmginfo:ScaleDamage( 0.1 )
-				end
-				timer.Simple(10, function()
-					hook.Remove("ScalePlayerDamage", "ACMakesNoDamage")
-				end)	
-			end)
-		end
-
-
 		--First we create a Pool with all possible Targets--
-		local function CreateTemplarPool(ply)
+		local function CreateTemplarPool(buyer)
 			local creed_targets = {}
 			local creed_detes = {}
 
-			if not IsValid(ply) or not ply:IsActive() or not ply:Alive() or ply.IsGhost and ply:IsGhost() or ply:GetTeam() ~= TEAM_TRAITOR then
+			if not IsValid(buyer) or not buyer:IsActive() or not buyer:Alive() or buyer.IsGhost and buyer:IsGhost() or buyer:GetTeam() ~= TEAM_TRAITOR then
 				return creed_targets
 			end
 
-			for _, plys in ipairs(player.GetAll()) do
-				if plys:Alive() and plys:IsActive() and not plys:IsInTeam(ply) and (not plys.IsGhost or not plys:IsGhost()) and (not JESTER or not plys:IsRole(ROLE_JESTER)) then
-					if plys:IsRole(ROLE_DETECTIVE) then
-						creed_detes[#creed_detes + 1] = plys
-					elseif plys:GetTeam() == ply:GetTeam() or plys:GetSubRole() == ROLE_SPY or plys:GetRole() == ROLE_PIRATE or plys:GetRole() == ROLE_BODYGUARD then
+			for _, buyers in ipairs(player.GetAll()) do
+				if buyers:Alive() and buyers:IsActive() and not buyers:IsInTeam(buyer) and (not buyers.IsGhost or not buyers:IsGhost()) and (not JESTER or not buyers:IsRole(ROLE_JESTER)) then
+					if buyers:IsRole(ROLE_DETECTIVE) then
+						creed_detes[#creed_detes + 1] = buyers
+					elseif buyers:GetTeam() == buyer:GetTeam() or buyers:GetSubRole() == ROLE_SPY or buyers:GetRole() == ROLE_PIRATE or buyers:GetRole() == ROLE_BODYGUARD then
 						return
 					else
-						creed_targets[#creed_targets + 1] = plys
+						creed_targets[#creed_targets + 1] = buyers
 					end
 				end
 			end
@@ -211,19 +199,27 @@ if SERVER then
 
 		--We need a Table with all T-Colleagues of the Assassin--
 		local tcolleagues = {}
-			for _, tplys in pairs(player.GetAll()) do
-				if tplys ~= ply and tplys:GetTeam() == TEAM_TRAITOR then
-					table.insert( tcolleagues, tplys )
+			for _, tbuyers in pairs(player.GetAll()) do
+				if tbuyers ~= buyer and tbuyers:GetTeam() == TEAM_TRAITOR then
+					table.insert( tcolleagues, tbuyers )
 				end
 			end
 
 		--And another one for a Message, including the Assassin--
 		local traitorteam = {}
-			for _, traitorsplys in pairs(player.GetAll()) do
-				if traitorsplys:GetTeam() == TEAM_TRAITOR then
-					table.insert( traitorteam, traitorsplys )
+			for _, traitorsbuyers in pairs(player.GetAll()) do
+				if traitorsbuyers:GetTeam() == TEAM_TRAITOR then
+					table.insert( traitorteam, traitorsbuyers )
 				end
 			end
+
+		--And another one without any traitors at all--
+		local notrbuyers = {}
+			for _, innobuyers in pairs(player.GetAll()) do
+				if innobuyers:GetTeam() ~= TEAM_TRAITOR then
+					table.insert( notrbuyers, innobuyers )
+				end
+			end	
 
 		--We gather all spawns to use them soon--
 		local spawnpointofmap = {}
@@ -246,12 +242,12 @@ if SERVER then
 		
 		-- Setting up the Revival-Option for the Team_Traitor--
 		hook.Add("TTT2PostPlayerDeath", "RevivalOfAC", function(ply)
-			if ply.ACRevivalOption then
-				if ply:GetTeam() == TEAM_TRAITOR then
+			if buyer.ACRevivalOption then
+				if ply:GetTeam() == TEAM_TRAITOR then 
 					net.Start("ACPRevivalMessage")
-					net.Send( victim )
-					ply:Revive(5)
-					timer.Simple(5.1, function()
+					net.Send( ply )
+					ply:Revive(10)
+					timer.Simple(10.1, function()
 						ply:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos()) 
 					end)
 					hook.Remove("TTT2PostPlayerDeath", "RevivalOfAC")
@@ -261,13 +257,13 @@ if SERVER then
 
 		--We start a timer, so that the Assassin can prepare themselves. Then they get the Target and the Clock starts ticking--
 		timer.Simple(5, function()	
-			if CreedThemeActive:GetBool() and ply:Alive() then
+			if CreedThemeActive:GetBool() and buyer:Alive() then
 				creed_ostplays = true
 				creed_sound = ReadSound(ACOST[math.random(1, #ACOST)])
 				creed_sound:Play()
 			end
 
-			local creed_targets = CreateTemplarPool(ply)
+			local creed_targets = CreateTemplarPool(buyer)
 			local ChosenTemplar
 
 			if #creed_targets > 0 then
@@ -275,7 +271,7 @@ if SERVER then
 			end
 				net.Start("ACPMessage")
 				net.WriteEntity( ChosenTemplar )
-				net.Send( ply )
+				net.Send( buyer )
 
 				net.Start("ACTMessage")
 				net.WriteEntity( ChosenTemplar )
@@ -283,33 +279,33 @@ if SERVER then
 
 			--This Hook controls everything. When the contract is done, the Assassin gets his reward. When he was supported, he will fail.-- 
 			hook.Add("PlayerDeath", "TemplarDeath", function(victim, inflictor, attacker)
-				if ( victim == ChosenTemplar ) and ( attacker == ply ) then
-
-					ply:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos())
+				if ( victim == ChosenTemplar ) and ( attacker == buyer ) then
 
 					if CreedRevivalFActive:GetBool() then
-						ply.ACRevivalOption = true
+						buyer.ACRevivalOption = true
 					end
 
-					ply:GodEnable()
-					ply:SetHealth(220)
+					buyer:GodEnable()
+					buyer:SetHealth(220)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
 					net.Start("ACPSuccessMessage")
 				 	net.WriteEntity( ChosenTemplar )
-					net.Send( ply )
-					ply:SetNWBool("CreedDisguise", false)
-					timer.Simple(10, function()
+					net.Send( buyer )
+					buyer:SetNWBool("CreedDisguise", false)
+					timer.Simple(4, function()
 						if ( CreedRevivalFActive:GetBool() ) then
 							net.Start("ACPGetRevivalMessage")
 							net.Send( traitorteam )
 						end	
 					end)
 
-					if ( CreedEagleScreamActive:GetBool() ) then
-						ply:EmitSound("eaglescream.wav")
-					end
-
 					if ( CreedThemeActive:GetBool() ) then
 						creed_sound:Stop()
+					end
+
+					if ( CreedEagleScreamActive:GetBool() ) then
+						buyer:EmitSound("eaglescream.wav")
 					end
 
 					for _, g in pairs(player.GetAll()) do
@@ -318,17 +314,20 @@ if SERVER then
 						end
 					end
 
-					CreedBroadcast("Anonymous Creed: ", Color(255, 114, 86), "The Assassin disappeared. There´s no trace of him. He fulfilled his contract. The Game goes on!")
+					buyer:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos())
+
+					net.Start("ACDisappearMessage")
+					net.Send( notrbuyers )
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
-				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR and attacker ~= ply then
-					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The treacherous Assassin ", Color(255, 255, 000), ply:Nick(), Color(153, 0, 0), " was support by a Traitor called ", Color(255, 255, 000), attacker:Nick(), Color(153, 0, 0), ". You can kill them!")
+				elseif victim == ChosenTemplar and attacker:GetTeam() == TEAM_TRAITOR and attacker ~= buyer then
+					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The treacherous Assassin ", Color(255, 255, 000), buyer:Nick(), Color(153, 0, 0), " was support by a Traitor called ", Color(255, 255, 000), attacker:Nick(), Color(153, 0, 0), ". You can kill them!")
 
-					ply:SetWalkSpeed(250)
-					ply:SetJumpPower(200)
-					ply:SetHealth(100)
-					ply:SetNWBool("CreedDisguise", false)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
+					buyer:SetHealth(100)
+					buyer:SetNWBool("CreedDisguise", false)
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
@@ -336,17 +335,17 @@ if SERVER then
 						creed_sound:Stop()
 					end
 
-				elseif victim == ChosenTemplar and attacker ~= ply and not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
-					if ply:HasEquipmentItem("item_ttt_the_assassin") then
+				elseif victim == ChosenTemplar and attacker ~= buyer and not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
+					if buyer:HasEquipmentItem("item_ttt_the_assassin") then
 						net.Start("ACPUninitiatedMessage")
 						net.WriteEntity( ChosenTemplar )
-						net.Send( ply )
+						net.Send( buyer )
 					end
 
-					ply:SetWalkSpeed(250)
-					ply:SetJumpPower(200)
-					ply:SetHealth(180)
-					ply:SetNWBool("CreedDisguise", false)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
+					buyer:SetHealth(180)
+					buyer:SetNWBool("CreedDisguise", false)
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
@@ -357,12 +356,12 @@ if SERVER then
 				elseif victim == ChosenTemplar and victim == attacker or attacker:IsWorld() then
 					net.Start("ACPassAwayMessage")
 					net.WriteEntity( ChosenTemplar )
-					net.Send( ply )
+					net.Send( buyer )
 
-					ply:SetWalkSpeed(250)
-					ply:SetJumpPower(200)
-					ply:SetHealth(180)
-					ply:SetNWBool("CreedDisguise", false)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
+					buyer:SetHealth(180)
+					buyer:SetNWBool("CreedDisguise", false)
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
@@ -378,19 +377,19 @@ if SERVER then
 			timer.Simple(120, function()
 				if ChosenTemplar:Alive() then
 					net.Start("ACPTimeLeftMessage")
-					net.Send( ply )
+					net.Send( buyer )
 				end
 			end)
 
 			--The Assassin fails. He gets revealed and he loses his advantages--
 			timer.Create("ClockIsTicking", 150, 1, function()
 				if ChosenTemplar:Alive() then
-					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The Assassin ", Color(255, 255, 000), ply:Nick(), Color(153, 0, 0), " has failed. You can kill him. He isn´t one of us anymore!")
+					CreedBroadcast("Anonymous Creed: ", Color(153, 0, 0), "The Assassin ", Color(255, 255, 000), buyer:Nick(), Color(153, 0, 0), " has failed. You can kill him. He isn´t one of us anymore!")
 
-					ply:SetWalkSpeed(250)
-					ply:SetJumpPower(200)
-					ply:SetHealth(100)
-					ply:SetNWBool("CreedDisguise", false)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
+					buyer:SetHealth(100)
+					buyer:SetNWBool("CreedDisguise", false)
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
 
@@ -402,14 +401,14 @@ if SERVER then
 
 			--When the Assassin dies, the Timer and Hook above shall be removed--
 			hook.Add("PlayerDeath", "AssassinDies", function( victim, inflictor, attacker )
-				if victim == ply then
+				if victim == buyer then
 					timer.Remove("ClockIsTicking")
 
 					hook.Remove("PlayerDeath" ,"TemplarDeath")
-					ply:SetWalkSpeed(250)
-					ply:SetJumpPower(200)
-					ply:SetHealth(180)
-					ply:SetNWBool("CreedDisguise", false)
+					buyer:SetWalkSpeed(250)
+					buyer:SetJumpPower(200)
+					buyer:SetHealth(100)
+					buyer:SetNWBool("CreedDisguise", false)
 
 					if CreedThemeActive:GetBool() then
 						creed_sound:Stop()
@@ -419,13 +418,13 @@ if SERVER then
 		end)
 	end
 
-	function ITEM:RESET(ply)
+	function ITEM:RESET(buyer)
 		hook.Remove("PlayerDeath" ,"TemplarDeath")
 		hook.Remove("PlayerDeath","AssassinDies")
 		if CreedRevivalFActive:GetBool() then	
 			hook.Remove("PlayerDeath", "RevivalOfAC")
 		end
-		ply.ACRevivalOption = false	
+		buyer.ACRevivalOption = false	
 		timer.Remove("ClockIsTicking")
 		timer.Remove("LetACrespawn")
 		for _, j in pairs(player.GetAll()) do
@@ -437,6 +436,17 @@ if SERVER then
 			end
 		end	
 	end
+
+	hook.Add("TTTPrepareRound", "ResettAll", function()
+		for _, j in pairs(player.GetAll()) do
+			if j:HasEquipmentItem("item_ttt_the_assassin") then
+				j:SetHealth(100)
+				j:SetWalkSpeed(250)
+				j:SetJumpPower(200)
+				j:SetNWBool("CreedDisguise", false)
+			end
+		end	
+	end)
 
 	--These Hooks ensure that you can see that the dead Assassin was one--
 	hook.Add("TTTBodySearchEquipment", "CreedoCorpseIcon", function(search, eq)
@@ -465,10 +475,10 @@ if CLIENT then
 
 	net.Receive("ACMUSIC", function(len)
 		local Music = net.ReadString()
-		local ply = LocalPlayer()
+		local buyer = LocalPlayer()
 
-		ply.Music = CreateSound(ply, Music .. ".ogg")
-		ply.Music:Play()
+		buyer.Music = CreateSound(buyer, Music .. ".ogg")
+		buyer.Music:Play()
 	end)
 
 	net.Receive("ACPMessage", function()
@@ -499,7 +509,7 @@ if CLIENT then
   	end)
 
   	net.Receive("ACPRevivalMessage", function()
-  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "We got you covered. You won´t die today. You´ll be revived in 20 Seconds at your Corpse.")
+  		chat.AddText("Anonymous Creed: ", Color(255,165,0), "We got you covered. You won´t die today. You´ll be revived in 10 Seconds at a random spawnpoint of the map.")
   		chat.PlaySound()
     end)
 
@@ -510,5 +520,11 @@ if CLIENT then
 	
 	net.Receive("ACPTimeLeftMessage", function()
 		chat.AddText("Anonymous Creed: ", Color(255,165,0), "Hurry Up! The Target is still alive & you have only 30 seconds left to kill him!")
+		chat.PlaySound()
+	end)
+
+	net.Receive("ACDisappearMessage", function()
+		chat.AddText("Anonymous Creed: ", Color(255, 114, 86), "The Assassin disappeared. There´s no trace of him. He fulfilled his contract. The Game goes on!")
+		chat.PlaySound()
 	end)
 end
