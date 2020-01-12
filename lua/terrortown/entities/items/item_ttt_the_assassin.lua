@@ -336,11 +336,11 @@ if SERVER then
 					end
 
 				elseif victim == ChosenTemplar and attacker ~= buyer and not attacker:GetTeam() == TEAM_TRAITOR and not attacker:IsWorld() and victim ~= attacker then
-					if buyer:HasEquipmentItem("item_ttt_the_assassin") then
-						net.Start("ACPUninitiatedMessage")
-						net.WriteEntity( ChosenTemplar )
-						net.Send( buyer )
-					end
+					net.Start("ACPUninitiatedMessage")
+					net.WriteEntity( ChosenTemplar )
+					net.Send( buyer )
+				
+					buyer:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos())	
 
 					buyer:SetWalkSpeed(250)
 					buyer:SetJumpPower(200)
@@ -357,6 +357,8 @@ if SERVER then
 					net.Start("ACPassAwayMessage")
 					net.WriteEntity( ChosenTemplar )
 					net.Send( buyer )
+
+					buyer:SetPos(spawnpointofmap[math.random(1, #spawnpointofmap)]:GetPos())
 
 					buyer:SetWalkSpeed(250)
 					buyer:SetJumpPower(200)
